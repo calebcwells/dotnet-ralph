@@ -12,7 +12,7 @@ Converts Product Requirements Documents from various formats into Ralph's `prd.j
 | Format | Detection | Example |
 |--------|-----------|---------|
 | **BMAD Method** | FR-XX, US-XX, NFR-XX identifiers, Gherkin syntax | Output from BMAD agents |
-| **GitHub Spec Kit** | `.speckit/` directory structure | Output from `/speckit.specify` |
+| **GitHub Spec Kit** | `specs/` or `.speckit/` directory structure | Output from `/speckit.specify` |
 | **Plain Markdown** | `## User Stories` section | Manual PRD documents |
 
 ## Usage
@@ -20,7 +20,8 @@ Converts Product Requirements Documents from various formats into Ralph's `prd.j
 ```
 /prd-converter                                   # Auto-detect PRD in current directory
 /prd-converter path/to/prd.md                    # Convert specific file
-/prd-converter .speckit/                         # Convert Spec Kit specs
+/prd-converter specs/                            # Convert Spec Kit specs
+/prd-converter specs/001-feature/                # Convert single spec
 /prd-converter docs/requirements/                # Convert from directory
 ```
 
@@ -28,11 +29,12 @@ Converts Product Requirements Documents from various formats into Ralph's `prd.j
 
 When invoked without arguments, the converter will search for PRDs in this order:
 
-1. `.speckit/` directory (Spec Kit format)
-2. `*.prd.md` files in current directory
-3. `PRD.md` or `prd.md` in current directory
-4. `tasks/prd-*.md` files
-5. `docs/` or `requirements/` directories
+1. `specs/` directory with numbered subdirs (Spec Kit format - preferred)
+2. `.speckit/` directory (Spec Kit format - legacy)
+3. `*.prd.md` files in current directory (BMAD or plain)
+4. `PRD.md` or `prd.md` in current directory
+5. `tasks/prd-*.md` files
+6. `docs/` or `requirements/` directories
 
 ## Workflow
 
@@ -41,7 +43,7 @@ When invoked without arguments, the converter will search for PRDs in this order
 First, identify the input format:
 
 - **BMAD**: Look for FR-XX, NFR-XX, US-XX identifiers, "## Epics" headers, Gherkin syntax (Given/When/Then)
-- **Spec Kit**: Look for `.speckit/` directory with spec.md, plan.md, tasks.md
+- **Spec Kit**: Look for `specs/` or `.speckit/` directory with spec.md, plan.md, tasks.md in numbered subdirs
 - **Plain Markdown**: Standard PRD with "## User Stories" or "## Requirements" sections
 
 ### 2. Parse Input
@@ -58,9 +60,30 @@ Use the appropriate converter rules:
 - Spec Kit: See `converters/spec-kit.md`
 - Plain Markdown: Direct mapping with story sizing validation
 
-### 4. Add Standard Acceptance Criteria
+### 4. Detect Feature Type (Code vs Non-Code)
 
-Append these acceptance criteria to every story:
+Before adding acceptance criteria, detect if this is a code feature or documentation/audit task.
+
+#### Code Feature Indicators
+
+A feature is a **code feature** if it has ANY of these:
+- References to entities, models, APIs, endpoints
+- Mentions database, EF Core, migrations
+- UI components, Blazor, forms, pages
+- Services, handlers, controllers
+- plan.md has "Language/Version" with a value (e.g., ".NET 8")
+
+#### Non-Code Feature Indicators
+
+A feature is **non-code** if it has ALL of these:
+- Output is documentation only (markdown files, reports)
+- No src/ modifications mentioned
+- plan.md shows "Language/Version: N/A" or "Technical Context: N/A"
+- Words like "documentation", "audit", "review", "inventory", "analysis"
+
+### 5. Add Standard Acceptance Criteria
+
+**For Code Features (default)**, append these acceptance criteria:
 - `Unit tests written (happy path + edge case)`
 - `Follows project architecture patterns from PRD/CLAUDE.md`
 - `dotnet build passes`
@@ -70,7 +93,12 @@ Append these acceptance criteria to every story:
 For UI stories, also add:
 - `Verify in browser using Playwright MCP`
 
-### 5. Story Sizing Analysis & Automatic Breakdown
+**For Non-Code Features**, append these instead:
+- `Deliverables verified (all specified outputs created)`
+- `Follows documentation standards from CLAUDE.md`
+- `All checklist items completed` (if checklists exist)
+
+### 6. Story Sizing Analysis & Automatic Breakdown
 
 Before outputting prd.json, analyze each story for size. **Stories that are too large will be automatically split.**
 
@@ -141,7 +169,7 @@ Total: 12 stories ready for Ralph execution.
 Proceed with conversion? [Y/n]
 ```
 
-### 6. Output prd.json
+### 7. Output prd.json
 
 Generate the final prd.json with this structure:
 

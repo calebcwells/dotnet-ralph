@@ -22,18 +22,13 @@ The priority field in prd.json is a suggestion. You may choose a different story
 
 1. Read the PRD at `prd.json`
 2. Read the progress log at `progress.txt` (check Codebase Patterns section first)
-3. Read `CLAUDE.md` for project conventions and patterns
+3. Read **project root `CLAUDE.md`** for project conventions, patterns, and architecture
 4. **Discover project patterns** (see section below)
 5. Verify you're on the correct branch from PRD `branchName`. If not, checkout or create from main.
 6. Pick the story YOU decide has highest priority where `passes: false`
-7. Implement that single user story (including unit tests!)
-8. Run .NET quality gates:
-   ```bash
-   dotnet build
-   dotnet test
-   dotnet format --verify-no-changes
-   ```
-9. Update CLAUDE.md if you discover reusable patterns
+7. Implement that single user story (including unit tests for code features!)
+8. Run quality gates (see Quality Gates section below)
+9. Update project CLAUDE.md if you discover reusable patterns
 10. If checks pass, commit ALL changes:
     ```bash
     git add -A
@@ -166,9 +161,11 @@ mcp__microsoft_docs_mcp__microsoft_docs_fetch
 
 ---
 
-## .NET Quality Requirements
+## Quality Gates
 
-All commits MUST pass these quality checks:
+### For Code Features
+
+All code commits MUST pass these quality checks:
 - `dotnet build` - Compilation succeeds with no errors or warnings treated as errors
 - `dotnet test` - All tests pass (including your new tests!)
 - `dotnet format --verify-no-changes` - Code formatting matches project standards
@@ -176,6 +173,21 @@ All commits MUST pass these quality checks:
 If analyzers are configured, they run as part of build. Fix all analyzer warnings before committing.
 
 Do NOT commit broken code. If quality gates fail, fix the issues before proceeding.
+
+### For Non-Code Features
+
+Documentation/audit tasks must verify:
+- All specified deliverables are created (markdown files, reports, etc.)
+- Documentation follows project standards from CLAUDE.md
+- All checklist items are completed (if checklists exist in the spec)
+
+No `dotnet` commands needed for non-code features.
+
+### How to Know Which Type
+
+Check the prd.json or original spec:
+- **Code feature**: Mentions entities, APIs, UI components, database, tests
+- **Non-code feature**: Output is documentation only, plan.md shows "Technical Context: N/A"
 
 ---
 

@@ -12,7 +12,7 @@ Ralph is an autonomous AI agent loop that implements features from a PRD iterati
 # Convert PRD to prd.json (auto-detects format)
 /prd-converter                     # Auto-detect PRD in current directory
 /prd-converter path/to/prd.md      # Convert specific file
-/prd-converter .speckit/           # Convert Spec Kit output
+/prd-converter specs/              # Convert Spec Kit output
 
 # Run Ralph to implement PRD stories
 /ralph                    # Run with default 10 iterations
@@ -22,7 +22,7 @@ Ralph is an autonomous AI agent loop that implements features from a PRD iterati
 ## Supported PRD Sources
 
 - **BMAD Method**: Epics with FR-XX, US-XX identifiers
-- **GitHub Spec Kit**: `.speckit/` directory with spec.md, plan.md, tasks.md
+- **GitHub Spec Kit**: `specs/` directory with spec.md, plan.md, tasks.md
 - **Plain Markdown**: PRD with `## User Stories` section
 
 ## .NET Quality Gates

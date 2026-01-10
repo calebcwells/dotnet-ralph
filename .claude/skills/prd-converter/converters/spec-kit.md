@@ -4,27 +4,45 @@ This document describes how to convert GitHub Spec Kit specifications to Ralph's
 
 ## Input Detection
 
-Detect Spec Kit format by looking for:
-- `.speckit/` directory structure
-- `spec.md`, `plan.md`, `tasks.md` files
-- Numbered directories (001-, 002-, etc.)
-- `[NEEDS CLARIFICATION:]` markers
+Detect Spec Kit format by looking for (in order of preference):
+
+1. **`specs/` directory** (preferred) with numbered subdirectories
+2. **`.speckit/` directory** (legacy/alternative)
+
+Within either directory, look for:
+- Numbered directories (001-xxx/, 002-xxx/, etc.)
+- `spec.md`, `plan.md`, `tasks.md` files in each numbered directory
+- `[NEEDS CLARIFICATION:]` markers in spec.md
 - `FR-X:` functional requirements markers
 
 ## Spec Kit Structure
 
 Typical Spec Kit project structure:
 ```
-.speckit/
-├── constitution.md         # Project guidelines
+specs/                        # Preferred location
+├── .registry/                # Spec Kit metadata
+├── .backups/                 # Backup files
 ├── 001-feature-one/
-│   ├── spec.md            # What to build (user stories)
-│   ├── plan.md            # How to build it (technical)
-│   └── tasks.md           # Breakdown of work
+│   ├── spec.md              # What to build (user stories)
+│   ├── plan.md              # How to build it (technical)
+│   ├── tasks.md             # Breakdown of work
+│   ├── research.md          # Research notes (optional)
+│   ├── quickstart.md        # Execution guide (optional)
+│   └── checklists/          # Feature-specific checklists
+│       └── requirements.md
 ├── 002-feature-two/
 │   ├── spec.md
 │   ├── plan.md
 │   └── tasks.md
+└── ...
+```
+
+Alternative (legacy) structure:
+```
+.speckit/
+├── constitution.md         # Project guidelines
+├── 001-feature-one/
+│   └── ...
 └── checklists/
     └── quality.md
 ```
@@ -33,41 +51,78 @@ Typical Spec Kit project structure:
 
 ### spec.md (User Stories)
 
+Real Spec Kit format uses priority markers and Gherkin-style scenarios:
+
 ```markdown
-# Feature Name
+# Feature Specification: Feature Name
 
-## Overview
-Brief description of the feature.
+**Feature Branch**: `001-feature-name`
+**Created**: 2025-12-11
+**Status**: Draft
 
-## User Stories
+## Clarifications
+- Q: Question asked → A: Answer received
 
-### Story Title
+## User Scenarios & Testing
+
+### User Story 1 - Story Title (Priority: P1)
+
 As a [user type], I want [goal] so that [benefit].
 
-**Acceptance Criteria:**
-- Criterion 1
-- Criterion 2
-- [NEEDS CLARIFICATION:] Unclear requirement
+**Why this priority**: Explanation of priority choice.
 
-## Functional Requirements
-- FR-1: Requirement description
-- FR-2: Another requirement
+**Independent Test**: How this story can be tested standalone.
+
+**Acceptance Scenarios**:
+
+1. **Given** precondition, **When** action, **Then** expected result.
+2. **Given** another precondition, **When** action, **Then** result.
+
+---
+
+### User Story 2 - Another Story (Priority: P2)
+...
+
+### Edge Cases
+- Edge case 1: How to handle
+- Edge case 2: How to handle
+
+## Requirements
+
+### Functional Requirements
+- **FR-001**: System MUST do something
+- **FR-002**: System MUST do something else
+
+### Key Entities
+- **Entity Name**: Description
+
+### Definitions
+- **Term**: Definition
 ```
 
 ### plan.md (Technical Plan)
 
 ```markdown
-# Implementation Plan
+# Implementation Plan: Feature Name
 
-## Branch
-`feature/feature-name`
+**Branch**: `001-feature-name` | **Date**: 2025-12-11
 
-## Architecture
-Technical approach description.
+## Summary
+Brief description of what will be built.
 
-## Dependencies
-- Depends on feature X
-- Requires package Y
+## Technical Context
+**Language/Version**: .NET 8 / C# 12  (or "N/A" for non-code features)
+**Primary Dependencies**: List of dependencies
+**Testing**: Test approach
+**Constraints**: Any constraints
+
+## Constitution Check
+| Principle | Status | Notes |
+|-----------|--------|-------|
+| P1: ... | ✅ PASS | ... |
+
+## Project Structure
+Where files will be created/modified.
 
 ## Complexity
 | Component | Complexity | Notes |
@@ -79,37 +134,58 @@ Technical approach description.
 ### tasks.md (Task Breakdown)
 
 ```markdown
-# Tasks
+# Tasks: Feature Name
+
+**Tests**: Required / Not required
+**Organization**: How tasks are organized
 
 ## Phase 1: Setup
-- [ ] Task 1
-- [ ] Task 2
+- [X] T001 Completed task
+- [ ] T002 [P] Parallel task (can run with others)
+- [ ] T003 [US1] Task for User Story 1
+
+**Checkpoint**: What should be true after this phase
 
 ## Phase 2: Implementation
-- [ ] Task 3
-- [ ] Task 4
+- [ ] T004 [P] [US1] Parallel task for US1
+- [ ] T005 [US2] Task for User Story 2
+
+## Dependencies & Execution Order
+- Phase 1 must complete before Phase 2
+- Tasks marked [P] can run in parallel
 ```
 
 ## Mapping Rules
 
 ### From spec.md
 
-1. Extract `## User Stories` section
-2. Each `### Story Title` becomes a user story
-3. Parse acceptance criteria lists
-4. Extract functional requirements as additional stories
+1. Extract `## User Scenarios & Testing` section
+2. Each `### User Story X - Title (Priority: PX)` becomes a user story
+3. Parse priority from `(Priority: P1)` marker:
+   - P1 → priority 1-10
+   - P2 → priority 11-20
+   - P3 → priority 21-30
+   - P4 → priority 31-40
+4. Convert Gherkin scenarios to acceptance criteria
+5. Include edge cases in notes
+6. Extract functional requirements as additional validation
 
 ### From plan.md
 
-1. Use branch name from `## Branch` section
-2. Note dependencies for priority ordering
+1. Use branch name from header or `## Branch` section
+2. Check `## Technical Context` for feature type:
+   - If "Language/Version: N/A" → non-code feature
+   - If mentions .NET/C# → code feature
 3. Use complexity table for story sizing validation
+4. Check constitution status for any concerns
 
 ### From tasks.md
 
 1. If tasks.md exists, use it to validate story breakdown
-2. Each phase can inform priority grouping
-3. Checkbox items help validate acceptance criteria completeness
+2. Map `[USX]` markers to corresponding user stories
+3. Tasks marked `[P]` indicate parallelizable work
+4. Checkpoints define natural story boundaries
+5. Count unchecked tasks per story for sizing
 
 ## Priority from Directory Numbering
 
@@ -122,7 +198,9 @@ Spec Kit uses numbered directories for ordering:
 | 003-xxx | 21-30 |
 | etc. | +10 per directory |
 
-Within a directory, stories are numbered sequentially.
+Within a directory, use story priority markers (P1, P2, P3, P4) to order:
+- P1 stories get lowest priority numbers (most important)
+- P4 stories get highest priority numbers (least important)
 
 ## Handling Special Markers
 

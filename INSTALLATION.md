@@ -7,10 +7,11 @@ This guide explains how to add Ralph to your .NET project for autonomous AI-driv
 ```bash
 # From your project root
 cp -r /path/to/ralph/.claude .
-cp /path/to/ralph/CLAUDE.md .
 ```
 
 That's it! Ralph is now available in your project via `/ralph`.
+
+**Note**: Ralph does NOT overwrite your existing CLAUDE.md. Ralph-specific instructions live in `.claude/ralph/CLAUDE.md`.
 
 ---
 
@@ -37,7 +38,7 @@ your-project/
 │       │       └── spec-kit.md       # Spec Kit conversion rules
 │       └── compound-engineering/     # Optional: systematic development
 │           └── SKILL.md
-├── CLAUDE.md                         # Project patterns (required)
+├── CLAUDE.md                         # YOUR project patterns (keep existing!)
 └── prd.json                          # Created when you run /prd-converter
 ```
 
@@ -48,19 +49,28 @@ your-project/
    cp -r /path/to/ralph/.claude .
    ```
 
-2. **Copy CLAUDE.md template:**
-   ```bash
-   cp /path/to/ralph/CLAUDE.md .
-   ```
+2. **Keep your existing CLAUDE.md (if you have one):**
+   - Ralph reads your project's CLAUDE.md for patterns and conventions
+   - If you don't have a CLAUDE.md, you can use the template from ralph repo
 
-3. **Customize CLAUDE.md for your project:**
-   Edit `CLAUDE.md` to add your project-specific patterns and conventions.
-
-4. **Verify installation:**
+3. **Verify installation:**
    ```bash
    ls -la .claude/skills/ralph/
    ls -la .claude/agents/
    ```
+
+### How Ralph Uses CLAUDE.md
+
+Ralph reads your project's root `CLAUDE.md` for:
+- Project patterns and architecture
+- Coding conventions
+- Technology stack decisions
+
+Ralph's own workflow instructions are self-contained in `.claude/agents/ralph-worker.md`.
+
+This means:
+- Your existing CLAUDE.md is preserved (Ralph doesn't overwrite it)
+- If you don't have a CLAUDE.md, use the template from the ralph repo
 
 ---
 
@@ -74,7 +84,7 @@ your-project/
 | `.claude/skills/ralph/SKILL.md` | `.claude/skills/ralph/SKILL.md` | Orchestrator skill |
 | `.claude/skills/ralph/scripts/validate-quality.ps1` | `.claude/skills/ralph/scripts/validate-quality.ps1` | .NET quality gate script |
 | `.claude/skills/prd-converter/` | `.claude/skills/prd-converter/` | PRD conversion (BMAD, Spec Kit, markdown) |
-| `CLAUDE.md` | `CLAUDE.md` | Project patterns template |
+| `CLAUDE.md` (template only) | N/A - keep your existing | Example project patterns template |
 
 ### Optional Skills
 
