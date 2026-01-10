@@ -1,80 +1,87 @@
-# Ralph
+# Ralph for Claude Code
 
 ![Ralph](ralph.webp)
 
-Ralph is an autonomous AI agent loop that runs [Amp](https://ampcode.com) repeatedly until all PRD items are complete. Each iteration is a fresh Amp instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
+Ralph is an autonomous AI agent loop that uses Claude Code subagents to iteratively implement features from a PRD. Each iteration spawns a fresh subagent with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
 
 Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
-[Read my in-depth article on how I use Ralph](https://x.com/ryancarson/status/2008548371712135632)
+**This is a Claude Code adaptation** - for the original Amp version, see the [upstream repository](https://github.com/snarktank/ralph).
 
 ## Prerequisites
 
-- [Amp CLI](https://ampcode.com) installed and authenticated
-- `jq` installed (`brew install jq` on macOS)
+- [Claude Code](https://claude.com/claude-code) installed and authenticated
+- .NET SDK 8.0+ installed
 - A git repository for your project
 
 ## Setup
 
 ### Option 1: Copy to your project
 
-Copy the ralph files into your project:
+Copy the Ralph files into your .NET project:
 
 ```bash
 # From your project root
-mkdir -p scripts/ralph
-cp /path/to/ralph/ralph.sh scripts/ralph/
-cp /path/to/ralph/prompt.md scripts/ralph/
-chmod +x scripts/ralph/ralph.sh
+cp -r /path/to/ralph/.claude .
+cp /path/to/ralph/CLAUDE.md .
 ```
 
 ### Option 2: Install skills globally
 
-Copy the skills to your Amp config for use across all projects:
+Copy the skills to your Claude Code config for use across all projects:
 
 ```bash
-cp -r skills/prd ~/.config/amp/skills/
-cp -r skills/ralph ~/.config/amp/skills/
+cp -r .claude/skills/* ~/.claude/skills/
 ```
-
-### Configure Amp auto-handoff (recommended)
-
-Add to `~/.config/amp/settings.json`:
-
-```json
-{
-  "amp.experimental.autoHandoff": { "context": 90 }
-}
-```
-
-This enables automatic handoff when context fills up, allowing Ralph to handle large stories that exceed a single context window.
 
 ## Workflow
 
 ### 1. Create a PRD
 
-Use the PRD skill to generate a detailed requirements document:
+Use your preferred PRD generation method:
 
-```
-Load the prd skill and create a PRD for [your feature description]
+**Option A: BMAD Method**
+```bash
+npx bmad-method@alpha install
+# Then use BMAD agents to create epics and user stories
 ```
 
-Answer the clarifying questions. The skill saves output to `tasks/prd-[feature-name].md`.
+**Option B: GitHub Spec Kit**
+```bash
+uvx --from git+https://github.com/github/spec-kit.git specify init my-feature
+# Then use /speckit.specify, /speckit.plan, /speckit.tasks
+```
+
+**Option C: Manual PRD**
+Create a markdown file with `## User Stories` section containing your requirements.
 
 ### 2. Convert PRD to Ralph format
 
-Use the Ralph skill to convert the markdown PRD to JSON:
+Use the converter skill to convert your PRD to prd.json:
 
 ```
-Load the ralph skill and convert tasks/prd-[feature-name].md to prd.json
+/prd-converter                    # Auto-detect PRD in current directory
+/prd-converter path/to/prd.md     # Convert specific file
+/prd-converter .speckit/          # Convert Spec Kit output
 ```
 
-This creates `prd.json` with user stories structured for autonomous execution.
+The converter will:
+- Detect the PRD format automatically (BMAD, Spec Kit, or plain markdown)
+- Extract user stories with acceptance criteria
+- Add .NET quality gate criteria
+- Order stories by dependency
+- Output `prd.json` ready for Ralph
 
 ### 3. Run Ralph
 
-```bash
-./scripts/ralph/ralph.sh [max_iterations]
+```
+/ralph
+```
+
+Or with a custom iteration limit:
+
+```
+/ralph 20
 ```
 
 Default is 10 iterations.
@@ -82,8 +89,8 @@ Default is 10 iterations.
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
 2. Pick the highest priority story where `passes: false`
-3. Implement that single story
-4. Run quality checks (typecheck, tests)
+3. Spawn a fresh subagent to implement that story
+4. Run quality checks (`dotnet build`, `dotnet test`, `dotnet format`)
 5. Commit if checks pass
 6. Update `prd.json` to mark story as `passes: true`
 7. Append learnings to `progress.txt`
@@ -93,14 +100,25 @@ Ralph will:
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh Amp instances |
-| `prompt.md` | Instructions given to each Amp instance |
-| `prd.json` | User stories with `passes` status (the task list) |
-| `prd.json.example` | Example PRD format for reference |
+| `.claude/skills/ralph/` | Main orchestrator skill |
+| `.claude/agents/ralph-worker.md` | Worker subagent that implements stories |
+| `.claude/skills/prd-converter/` | Converts PRDs to prd.json (supports BMAD, Spec Kit, markdown) |
+| `prd.json` | User stories with `passes` status |
 | `progress.txt` | Append-only learnings for future iterations |
-| `skills/prd/` | Skill for generating PRDs |
-| `skills/ralph/` | Skill for converting PRDs to JSON |
-| `flowchart/` | Interactive visualization of how Ralph works |
+| `CLAUDE.md` | Project patterns and conventions |
+| `INSTALLATION.md` | Detailed setup instructions |
+
+## .NET Quality Gates
+
+All commits must pass:
+- `dotnet build` - Compilation succeeds
+- `dotnet test` - All tests pass
+- `dotnet format --verify-no-changes` - Code formatting correct
+
+Run the quality gate script manually:
+```powershell
+.\.claude\skills\ralph\scripts\validate-quality.ps1
+```
 
 ## Flowchart
 
@@ -108,61 +126,50 @@ Ralph will:
 
 **[View Interactive Flowchart](https://snarktank.github.io/ralph/)** - Click through to see each step with animations.
 
-The `flowchart/` directory contains the source code. To run locally:
-
-```bash
-cd flowchart
-npm install
-npm run dev
-```
-
 ## Critical Concepts
 
 ### Each Iteration = Fresh Context
 
-Each iteration spawns a **new Amp instance** with clean context. The only memory between iterations is:
+Each iteration spawns a **new subagent** with clean context. The only memory between iterations is:
 - Git history (commits from previous iterations)
 - `progress.txt` (learnings and context)
 - `prd.json` (which stories are done)
+- `CLAUDE.md` (project patterns)
 
 ### Small Tasks
 
-Each PRD item should be small enough to complete in one context window. If a task is too big, the LLM runs out of context before finishing and produces poor code.
+Each PRD item should be small enough to complete in one context window. If a task is too big, the LLM runs out of context before finishing.
 
-Right-sized stories:
-- Add a database column and migration
-- Add a UI component to an existing page
-- Update a server action with new logic
+**Right-sized stories:**
+- Add an EF Core entity and migration
+- Add a Blazor component to an existing page
+- Create a single API endpoint
 - Add a filter dropdown to a list
 
-Too big (split these):
+**Too big (split these):**
 - "Build the entire dashboard"
 - "Add authentication"
 - "Refactor the API"
 
-### AGENTS.md Updates Are Critical
+### CLAUDE.md Updates Are Critical
 
-After each iteration, Ralph updates the relevant `AGENTS.md` files with learnings. This is key because Amp automatically reads these files, so future iterations (and future human developers) benefit from discovered patterns, gotchas, and conventions.
+After each iteration, Ralph updates `CLAUDE.md` with learnings. Claude Code automatically reads this file, so future iterations (and human developers) benefit from discovered patterns, gotchas, and conventions.
 
-Examples of what to add to AGENTS.md:
-- Patterns discovered ("this codebase uses X for Y")
-- Gotchas ("do not forget to update Z when changing W")
-- Useful context ("the settings panel is in component X")
+Examples of what to add to CLAUDE.md:
+- Patterns discovered ("use repository pattern for data access")
+- Gotchas ("run `dotnet ef migrations add` after modifying entities")
+- Useful context ("the settings panel is in Components/Settings/")
 
 ### Feedback Loops
 
 Ralph only works if there are feedback loops:
-- Typecheck catches type errors
-- Tests verify behavior
-- CI must stay green (broken code compounds across iterations)
+- `dotnet build` catches compilation errors
+- `dotnet test` verifies behavior
+- Quality gates must stay green (broken code compounds across iterations)
 
 ### Browser Verification for UI Stories
 
-Frontend stories must include "Verify in browser using dev-browser skill" in acceptance criteria. Ralph will use the dev-browser skill to navigate to the page, interact with the UI, and confirm changes work.
-
-### Stop Condition
-
-When all stories have `passes: true`, Ralph outputs `<promise>COMPLETE</promise>` and the loop exits.
+Frontend stories must include "Verify in browser using Playwright MCP" in acceptance criteria. Ralph uses Playwright MCP to navigate to the page, interact with the UI, and confirm changes work.
 
 ## Debugging
 
@@ -179,18 +186,28 @@ cat progress.txt
 git log --oneline -10
 ```
 
-## Customizing prompt.md
+## Supported PRD Sources
 
-Edit `prompt.md` to customize Ralph's behavior for your project:
-- Add project-specific quality check commands
-- Include codebase conventions
-- Add common gotchas for your stack
+### Plain Markdown PRD
+Standard requirements document with user stories section.
 
-## Archiving
+### BMAD Method
+The [BMAD Method](https://github.com/bmad-code-org/BMAD-METHOD) produces structured epics with FR-XX, US-XX identifiers and Gherkin-style acceptance criteria.
 
-Ralph automatically archives previous runs when you start a new feature (different `branchName`). Archives are saved to `archive/YYYY-MM-DD-feature-name/`.
+```
+/prd-converter path/to/bmad-prd.md --format bmad
+```
+
+### GitHub Spec Kit
+[GitHub Spec Kit](https://github.com/github/spec-kit) produces `.speckit/` directories with spec.md, plan.md, and tasks.md files.
+
+```
+/prd-converter .speckit/
+```
 
 ## References
 
 - [Geoffrey Huntley's Ralph article](https://ghuntley.com/ralph/)
-- [Amp documentation](https://ampcode.com/manual)
+- [BMAD Method](https://github.com/bmad-code-org/BMAD-METHOD)
+- [GitHub Spec Kit](https://github.com/github/spec-kit)
+- [Spec-Driven Development Blog Post](https://github.blog/ai-and-ml/generative-ai/spec-driven-development-with-ai-get-started-with-a-new-open-source-toolkit/)

@@ -8,9 +8,14 @@
       "title": "Add priority field to database",
       "description": "As a developer, I need to store task priority so it persists across sessions.",
       "acceptanceCriteria": [
-        "Add priority column to tasks table: 'high' | 'medium' | 'low' (default 'medium')",
-        "Generate and run migration successfully",
-        "Typecheck passes"
+        "Add Priority property to Task entity: enum (High, Medium, Low)",
+        "Add EF Core migration for priority column",
+        "Default value is Medium",
+        "Unit tests written (happy path + edge case)",
+        "Follows project architecture patterns from PRD/CLAUDE.md",
+        "dotnet build passes",
+        "dotnet test passes",
+        "dotnet format --verify-no-changes passes"
       ],
       "priority": 1,
       "passes": false,
@@ -23,10 +28,14 @@
       "acceptanceCriteria": [
         "Each task card shows colored priority badge (red=high, yellow=medium, gray=low)",
         "Priority visible without hovering or clicking",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Unit tests written (happy path + edge case)",
+        "Follows project architecture patterns from PRD/CLAUDE.md",
+        "dotnet build passes",
+        "dotnet test passes",
+        "dotnet format --verify-no-changes passes",
+        "Verify in browser using Playwright MCP"
       ],
-      "priority": 2,
+      "priority": 51,
       "passes": false,
       "notes": ""
     },
@@ -38,10 +47,14 @@
         "Priority dropdown in task edit modal",
         "Shows current priority as selected",
         "Saves immediately on selection change",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Unit tests written (happy path + edge case)",
+        "Follows project architecture patterns from PRD/CLAUDE.md",
+        "dotnet build passes",
+        "dotnet test passes",
+        "dotnet format --verify-no-changes passes",
+        "Verify in browser using Playwright MCP"
       ],
-      "priority": 3,
+      "priority": 52,
       "passes": false,
       "notes": ""
     },
@@ -53,10 +66,14 @@
         "Filter dropdown with options: All | High | Medium | Low",
         "Filter persists in URL params",
         "Empty state message when no tasks match filter",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Unit tests written (happy path + edge case)",
+        "Follows project architecture patterns from PRD/CLAUDE.md",
+        "dotnet build passes",
+        "dotnet test passes",
+        "dotnet format --verify-no-changes passes",
+        "Verify in browser using Playwright MCP"
       ],
-      "priority": 4,
+      "priority": 53,
       "passes": false,
       "notes": ""
     }
