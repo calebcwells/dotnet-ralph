@@ -4,190 +4,278 @@ This document describes how to convert BMAD Method PRDs to Ralph's prd.json form
 
 ## Input Detection
 
-Detect BMAD format by looking for:
+Detect BMAD format by looking for (in order of preference):
+
+### 1. Modern BMAD (`_bmad-output/` directory)
+
+Check for `_bmad-output/` directory containing:
+- `planning-artifacts/epics.md` - **Primary source** for story definitions (REQUIRED)
+- `planning-artifacts/prd.md` - Project context and requirements (for description)
+- `implementation-artifacts/sprint-status.yaml` - Story status tracking (optional)
+
+**This is the preferred BMAD format** - uses `epics.md` as the single source of truth for stories.
+
+### 2. Legacy BMAD (Markdown with identifiers)
+
+Look for these markers in markdown files:
+- FR-XX, NFR-XX, US-XX identifiers
 - `## Epics` or `### Epic:` headers
-- FR-XX, NFR-XX, US-XX identifiers (Functional Requirements, Non-Functional Requirements, User Stories)
 - Gherkin-style criteria (Given/When/Then)
 - `## Functional Requirements` section
-- `## Non-Functional Requirements` section
 
-## BMAD Structure
+---
 
-Typical BMAD PRD structure:
-```markdown
-# Feature Name
+## Modern BMAD Structure
 
-## Introduction
-...
+### Directory Layout
 
-## Goals
-...
-
-## Epics
-
-### Epic 1: Core Functionality
-#### US-001: First Story
-**Description:** As a user, I want...
-
-**Acceptance Criteria:**
-- Given X, When Y, Then Z
-- Given A, When B, Then C
-
-#### US-002: Second Story
-...
-
-## Functional Requirements
-- FR-01: The system shall...
-- FR-02: The system shall...
-
-## Non-Functional Requirements
-- NFR-01: Performance requirement...
+```
+_bmad-output/
+├── planning-artifacts/
+│   ├── prd.md                    # Product requirements (for context)
+│   ├── epics.md                  # Story definitions with acceptance criteria
+│   ├── architecture.md           # Architecture decisions
+│   └── ...
+├── implementation-artifacts/
+│   ├── sprint-status.yaml        # Status tracking (optional)
+│   └── X-Y-story-name.md         # Individual story files (not used by converter)
+└── project-context.md            # Project summary
 ```
 
-## Mapping Rules
+### Epics.md Format
 
-### From Epic to User Stories
+The `epics.md` file contains all story definitions:
 
-1. Each `#### US-XXX:` section maps to one user story
-2. Epic context becomes part of story description if helpful
-3. Dependencies between epics determine story priority
+```markdown
+## Epic 1: Project Foundation & Developer Shell
 
-### From Acceptance Criteria
+Developers can run the project locally with Aspire dashboard...
+
+### Story 1.1: Initialize Aspire Solution Structure
+
+As a **developer**,
+I want **a .NET Aspire solution with AppHost and ServiceDefaults projects**,
+So that **I can orchestrate services locally and have standardized configuration**.
+
+**Acceptance Criteria:**
+
+**Given** a fresh development environment with .NET 10 SDK installed
+**When** I clone the repository and open the solution
+**Then** I see a solution file with AppHost and ServiceDefaults projects
+**And** the AppHost project references ServiceDefaults
+**And** `dotnet build` completes without errors
+
+---
+
+### Story 1.2: Add Blazor Web Application Projects
+...
+```
+
+### Sprint Status YAML (Optional)
+
+If `sprint-status.yaml` exists, use it to filter stories by status:
+
+```yaml
+development_status:
+  epic-1: in-progress
+  1-1-initialize-aspire-solution-structure: ready-for-dev
+  1-2-add-blazor-web-application-projects: backlog
+  epic-2: backlog
+  2-1-implement-landing-page-layout: backlog
+```
+
+**Status filtering rules:**
+- `backlog` - Include in prd.json
+- `ready-for-dev` - Include in prd.json
+- `in-progress` - Include in prd.json (agent decides to continue or skip)
+- `review` - Optionally include (in review, may be done)
+- `done` - Exclude from prd.json (already completed)
+
+**Default behavior**: If no sprint-status.yaml exists, include ALL stories from epics.md.
+
+---
+
+## Parsing Rules
+
+### Extracting Stories from epics.md
+
+1. **Find Epic Headers**: Look for `## Epic X:` or `### Epic X:` patterns
+2. **Find Story Headers**: Look for `### Story X.Y:` or `#### Story X.Y:` patterns
+3. **Extract Story Content**:
+   - **Title**: Text after `Story X.Y:`
+   - **Description**: "As a..., I want..., So that..." section
+   - **Acceptance Criteria**: Gherkin blocks (Given/When/Then/And)
+
+### Story ID Format
+
+Modern BMAD uses `X-Y` format (epic-story number):
+
+| Input | prd.json ID |
+|-------|-------------|
+| `Story 1.1:` | `1-1` |
+| `Story 2.3:` | `2-3` |
+| `Story 10.5:` | `10-5` |
+
+### Gherkin to Acceptance Criteria
 
 Convert Gherkin syntax to imperative statements:
 
-| Gherkin | Imperative |
-|---------|------------|
-| Given X, When Y, Then Z | When Y with X, Z occurs |
-| Given logged in user, When submitting form, Then data is saved | Logged-in user can submit form and data is saved |
-| Given invalid input, When submitting, Then error shown | Invalid input displays error message |
-
-### From Functional Requirements
-
-FR-XX items that aren't covered by user stories become additional stories:
-
+**Input:**
 ```markdown
-FR-03: The system shall validate email format
+**Given** a fresh development environment with .NET 10 SDK installed
+**When** I clone the repository and open the solution
+**Then** I see a solution file with AppHost and ServiceDefaults projects
+**And** the AppHost project references ServiceDefaults
+**And** `dotnet build` completes without errors
 ```
 
-Becomes:
+**Output:**
 ```json
 {
-  "id": "FR-003",
-  "title": "Email Format Validation",
-  "description": "The system shall validate email format",
   "acceptanceCriteria": [
-    "Valid email formats are accepted",
-    "Invalid email formats show validation error",
-    "dotnet build passes",
-    "dotnet test passes"
+    "Solution with AppHost and ServiceDefaults projects created",
+    "AppHost references ServiceDefaults",
+    "dotnet build completes without errors"
   ]
 }
 ```
 
-### From Non-Functional Requirements
+**Conversion patterns:**
+- Combine Given/When into context, Then becomes the assertion
+- **And** items become separate criteria
+- Remove markdown formatting (`**`, backticks)
+- Make statements imperative and concise
 
-NFR-XX items become acceptance criteria on relevant stories, or separate stories if testable:
-
-- Performance requirements → Add to relevant story criteria
-- Security requirements → Separate story if substantial
-- Accessibility requirements → Add to UI story criteria
+---
 
 ## Priority Assignment
 
-| Priority | Story Type | Examples |
-|----------|-----------|----------|
-| 1-10 | Infrastructure | Database schema, EF Core models, migrations |
-| 11-30 | Core Backend | Services, repositories, business logic |
-| 31-50 | API Layer | Controllers, endpoints, middleware |
-| 51-80 | UI Components | Blazor components, Razor pages |
-| 81-100 | Integration | End-to-end flows, auth integration |
-| 101+ | Polish | Performance optimization, edge cases |
+Map epic number to priority ranges:
 
-## ID Mapping
+| Epic | Priority Range | Description |
+|------|----------------|-------------|
+| Epic 1 | 1-10 | Foundation, infrastructure |
+| Epic 2 | 11-20 | Landing experience, trust signals |
+| Epic 3 | 21-40 | Core user input/entry |
+| Epic 4 | 41-60 | Backend analysis, APIs |
+| Epic 5 | 61-80 | Results display, output |
+| Epic 6 | 81-90 | Session management |
+| Epic 7 | 91-100 | Error handling |
+| Epic 8 | 101-110 | Legal, onboarding |
+| Epic 9+ | 111+ | Analytics, polish |
 
-Preserve original IDs where possible:
+Within each epic, stories are prioritized by their story number:
+- Story 1.1 = priority 1
+- Story 1.2 = priority 2
+- Story 2.1 = priority 11
+- Story 2.2 = priority 12
 
-| BMAD ID | prd.json ID |
-|---------|-------------|
-| US-001 | US-001 |
-| FR-03 | FR-003 |
-| NFR-01 | NFR-001 |
+**Formula**: `priority = (epic - 1) * 10 + story_number`
+
+(Adjust ranges if epic has many stories)
+
+---
 
 ## Example Transformation
 
-**BMAD Input:**
+### Modern BMAD Input
+
+**`_bmad-output/planning-artifacts/epics.md`:**
 ```markdown
-### Epic 1: User Authentication
+# TooManyMeds - Epic Breakdown
 
-#### US-001: User Registration
-**Description:** As a new user, I want to register so I can access the system.
+## Epic 1: Project Foundation & Developer Shell
+
+Developers can run the project locally with Aspire dashboard...
+
+### Story 1.1: Initialize Aspire Solution Structure
+
+As a **developer**,
+I want **a .NET Aspire solution with AppHost and ServiceDefaults projects**,
+So that **I can orchestrate services locally and have standardized configuration**.
 
 **Acceptance Criteria:**
-- Given a valid email, When registering, Then account is created
-- Given an existing email, When registering, Then error is shown
-- Given weak password, When registering, Then validation error shown
 
-#### US-002: User Login
-**Description:** As a registered user, I want to log in to access my account.
+**Given** a fresh development environment with .NET 10 SDK installed
+**When** I clone the repository and open the solution
+**Then** I see a solution file with AppHost and ServiceDefaults projects
+**And** the AppHost project references ServiceDefaults
+**And** `dotnet build` completes without errors
+**And** `dotnet run --project src/TooManyMeds.AppHost` launches the Aspire dashboard
+
+---
+
+### Story 1.2: Add Blazor Web Application Projects
+
+As a **developer**,
+I want **Blazor Web App with Server and Client projects configured for InteractiveAuto**,
+So that **the app renders server-side first then transitions to WebAssembly**.
 
 **Acceptance Criteria:**
-- Given valid credentials, When logging in, Then user is authenticated
-- Given invalid credentials, When logging in, Then error is shown
+
+**Given** the Aspire solution from Story 1.1
+**When** I add the Web and Web.Client projects
+**Then** TooManyMeds.Web is a Blazor Web App with InteractiveAuto render mode
+**And** both projects target .NET 10 with nullable reference types enabled
+**And** the AppHost orchestrates the Web project
 ```
 
-**prd.json Output:**
+### prd.json Output
+
 ```json
 {
-  "project": "MyApp",
-  "branchName": "ralph/user-authentication",
-  "description": "User Authentication - Epic 1",
+  "project": "TooManyMeds",
+  "branchName": "ralph/too-many-meds-foundation",
+  "description": "TooManyMeds - Patient medication interaction checker. Epic 1: Project Foundation & Developer Shell",
   "userStories": [
     {
-      "id": "US-001",
-      "title": "User Registration",
-      "description": "As a new user, I want to register so I can access the system.",
+      "id": "1-1",
+      "title": "Initialize Aspire Solution Structure",
+      "description": "As a developer, I want a .NET Aspire solution with AppHost and ServiceDefaults projects, so that I can orchestrate services locally and have standardized configuration.",
       "acceptanceCriteria": [
-        "Valid email creates new account",
-        "Existing email shows registration error",
-        "Weak password shows validation error",
+        "Solution with AppHost and ServiceDefaults projects created",
+        "AppHost references ServiceDefaults",
+        "dotnet run --project src/TooManyMeds.AppHost launches Aspire dashboard",
+        "Setup verified (solution builds and runs)",
+        "Follows project architecture patterns from CLAUDE.md",
         "dotnet build passes",
-        "dotnet test passes",
-        "dotnet format --verify-no-changes passes",
-        "Verify in browser using Playwright MCP"
+        "dotnet format --verify-no-changes passes"
       ],
-      "priority": 51,
+      "priority": 1,
       "passes": false,
-      "notes": "Part of Epic 1: User Authentication"
+      "notes": "Part of Epic 1: Project Foundation & Developer Shell. Type: Infrastructure"
     },
     {
-      "id": "US-002",
-      "title": "User Login",
-      "description": "As a registered user, I want to log in to access my account.",
+      "id": "1-2",
+      "title": "Add Blazor Web Application Projects",
+      "description": "As a developer, I want Blazor Web App with Server and Client projects configured for InteractiveAuto, so that the app renders server-side first then transitions to WebAssembly.",
       "acceptanceCriteria": [
-        "Valid credentials authenticate user successfully",
-        "Invalid credentials show login error",
+        "TooManyMeds.Web is Blazor Web App with InteractiveAuto render mode",
+        "Both projects target .NET 10 with nullable reference types enabled",
+        "AppHost orchestrates the Web project",
+        "Setup verified (solution builds and runs)",
+        "Follows project architecture patterns from CLAUDE.md",
         "dotnet build passes",
-        "dotnet test passes",
-        "dotnet format --verify-no-changes passes",
-        "Verify in browser using Playwright MCP"
+        "dotnet format --verify-no-changes passes"
       ],
-      "priority": 52,
+      "priority": 2,
       "passes": false,
-      "notes": "Part of Epic 1: User Authentication. Depends on US-001."
+      "notes": "Part of Epic 1: Project Foundation & Developer Shell. Depends on 1-1."
     }
   ]
 }
 ```
 
+---
+
 ## Story Sizing & Automatic Breakdown
 
-BMAD epics often contain stories that are too large for a single Ralph iteration. **Stories will be automatically split** based on the following rules.
+Stories in BMAD epics.md are often already well-sized since BMAD's story creation process is iterative. However, **stories may still need splitting** based on these rules.
 
 ### Size Indicators (Too Large)
 
 A story is **TOO LARGE** if it has ANY of these:
-- More than 5 feature-specific acceptance criteria
+- More than 5 feature-specific acceptance criteria (excluding standard .NET criteria)
 - Contains "and" connecting distinct features
 - Mentions multiple entities/tables
 - Includes both backend AND frontend work
@@ -200,50 +288,20 @@ A story is **TOO LARGE** if it has ANY of these:
 
 **Input:**
 ```markdown
-#### US-010: User Management
-**Acceptance Criteria:**
-- Admin can create new users
-- Admin can view user list
-- Admin can update user details
-- Admin can delete users
-- Users can be filtered by role
+### Story 3.4: Medication List Management
+- User can add medications
+- User can view medication list
+- User can edit medication details
+- User can remove medications
 ```
 
 **Output:**
 ```json
 [
-  {
-    "id": "US-010a",
-    "title": "Create User (Backend)",
-    "description": "Admin can create new users in the system",
-    "notes": "Split from US-010: User Management",
-    "originalStoryId": "US-010",
-    "priority": 11
-  },
-  {
-    "id": "US-010b",
-    "title": "Get User by ID (Backend)",
-    "notes": "Split from US-010: User Management",
-    "priority": 12
-  },
-  {
-    "id": "US-010c",
-    "title": "Update User (Backend)",
-    "notes": "Split from US-010: User Management",
-    "priority": 13
-  },
-  {
-    "id": "US-010d",
-    "title": "Delete User (Backend)",
-    "notes": "Split from US-010: User Management",
-    "priority": 14
-  },
-  {
-    "id": "US-010e",
-    "title": "List Users with Filtering (Backend)",
-    "notes": "Split from US-010: User Management",
-    "priority": 15
-  }
+  {"id": "3-4a", "title": "Add Medication to List", "priority": 31},
+  {"id": "3-4b", "title": "View Medication List", "priority": 32},
+  {"id": "3-4c", "title": "Edit Medication Details", "priority": 33},
+  {"id": "3-4d", "title": "Remove Medication from List", "priority": 34}
 ]
 ```
 
@@ -251,110 +309,56 @@ A story is **TOO LARGE** if it has ANY of these:
 
 **Input:**
 ```markdown
-#### US-005: Task Priority Feature
-**Acceptance Criteria:**
-- Add Priority field to Task entity
-- Create API endpoint for priority updates
-- Display priority badge on task cards
-- Add priority selector in edit modal
+### Story 4.1: RxNorm Integration
+- Create RxNorm API client
+- Add medication search endpoint
+- Build autocomplete component
+- Display search results
 ```
 
 **Output:**
 ```json
 [
-  {
-    "id": "US-005a",
-    "title": "Add Priority Entity and Migration",
-    "acceptanceCriteria": [
-      "Priority enum added to Task entity (High, Medium, Low)",
-      "EF Core migration created and applied",
-      "Unit tests written (happy path + edge case)",
-      "dotnet build passes",
-      "dotnet test passes"
-    ],
-    "priority": 1,
-    "notes": "Split from US-005: Task Priority Feature - Backend/Schema"
-  },
-  {
-    "id": "US-005b",
-    "title": "Priority API Endpoint",
-    "acceptanceCriteria": [
-      "PUT /api/tasks/{id}/priority endpoint created",
-      "Endpoint validates priority value",
-      "Returns updated task on success",
-      "Unit tests written (happy path + edge case)",
-      "dotnet build passes",
-      "dotnet test passes"
-    ],
-    "priority": 11,
-    "notes": "Split from US-005: Task Priority Feature - Backend/API"
-  },
-  {
-    "id": "US-005c",
-    "title": "Display Priority Badge on Task Cards",
-    "acceptanceCriteria": [
-      "Priority badge shows on each task card",
-      "Colors: red=high, yellow=medium, gray=low",
-      "Badge visible without interaction",
-      "Unit tests written (happy path + edge case)",
-      "dotnet build passes",
-      "dotnet test passes",
-      "Verify in browser using Playwright MCP"
-    ],
-    "priority": 51,
-    "notes": "Split from US-005: Task Priority Feature - Frontend/Display"
-  },
-  {
-    "id": "US-005d",
-    "title": "Priority Selector in Edit Modal",
-    "acceptanceCriteria": [
-      "Priority dropdown in task edit modal",
-      "Shows current priority as selected",
-      "Saves on selection change",
-      "Unit tests written (happy path + edge case)",
-      "dotnet build passes",
-      "dotnet test passes",
-      "Verify in browser using Playwright MCP"
-    ],
-    "priority": 52,
-    "notes": "Split from US-005: Task Priority Feature - Frontend/Interaction"
-  }
+  {"id": "4-1a", "title": "RxNorm API Client", "priority": 41, "notes": "Backend"},
+  {"id": "4-1b", "title": "Medication Search Endpoint", "priority": 42, "notes": "Backend"},
+  {"id": "4-1c", "title": "Autocomplete Component", "priority": 43, "notes": "Frontend"},
+  {"id": "4-1d", "title": "Display Search Results", "priority": 44, "notes": "Frontend"}
 ]
 ```
 
-#### Multiple Entities → Split by Entity
+### Story Type Detection
 
-**Input:**
-```markdown
-#### US-020: Order System
-**Acceptance Criteria:**
-- Products can be added to orders
-- Customers are linked to orders
-- Order totals are calculated
-- Orders can be submitted
-```
+Before adding acceptance criteria, detect the story type:
 
-**Output:**
-```json
-[
-  {"id": "US-020a", "title": "Product Entity and Repository", "priority": 1},
-  {"id": "US-020b", "title": "Customer Entity and Repository", "priority": 2},
-  {"id": "US-020c", "title": "Order Entity with Relationships", "priority": 3},
-  {"id": "US-020d", "title": "Order Total Calculation Service", "priority": 11},
-  {"id": "US-020e", "title": "Order Submission Endpoint", "priority": 21}
-]
-```
+| Type | Indicators | Example Stories |
+|------|------------|-----------------|
+| **Infrastructure** | "Initialize", "Configure", "Add...Project", creates *.csproj | 1-1, 1-2, 1-3, 1-5 |
+| **Backend Logic** | "Build...Client", "Implement...Service", creates services/handlers | 1-4, 3-1, 4-2, 4-3, 4-4 |
+| **UI Component** | "Display", "Create...Component", Blazor pages | 2-1, 2-2, 3-2, 3-3, 5-1 |
+| **Integration** | "Integrate", "Add...Monitoring", external service config | 4-1, 4-10, 9-1 |
 
-### Standard Acceptance Criteria
+### Type-Specific Acceptance Criteria
 
-Every story output must include these standard criteria:
+**Infrastructure Stories** (setup, scaffolding, tooling):
 ```json
 {
   "acceptanceCriteria": [
     "Feature-specific criterion 1",
-    "Feature-specific criterion 2",
+    "Setup verified (solution builds and runs)",
+    "Follows project architecture patterns from CLAUDE.md",
+    "dotnet build passes",
+    "dotnet format --verify-no-changes passes"
+  ]
+}
+```
+
+**Backend Logic Stories** (services, handlers, business logic):
+```json
+{
+  "acceptanceCriteria": [
+    "Feature-specific criterion 1",
     "Unit tests written (happy path + edge case)",
-    "Follows project architecture patterns from PRD/CLAUDE.md",
+    "Follows project architecture patterns from CLAUDE.md",
     "dotnet build passes",
     "dotnet test passes",
     "dotnet format --verify-no-changes passes"
@@ -362,9 +366,32 @@ Every story output must include these standard criteria:
 }
 ```
 
-For UI stories, also add:
+**UI Component Stories** (Blazor components, pages):
 ```json
-"Verify in browser using Playwright MCP"
+{
+  "acceptanceCriteria": [
+    "Feature-specific criterion 1",
+    "Component tests written (bUnit)",
+    "Follows project architecture patterns from CLAUDE.md",
+    "dotnet build passes",
+    "dotnet test passes",
+    "dotnet format --verify-no-changes passes",
+    "Verify in browser using Playwright MCP"
+  ]
+}
+```
+
+**Integration Stories** (external services, static pages):
+```json
+{
+  "acceptanceCriteria": [
+    "Feature-specific criterion 1",
+    "Integration verified (external service connected/configured)",
+    "Follows project architecture patterns from CLAUDE.md",
+    "dotnet build passes",
+    "dotnet format --verify-no-changes passes"
+  ]
+}
 ```
 
 ### Traceability
@@ -373,24 +400,73 @@ All split stories must maintain traceability to the original:
 
 ```json
 {
-  "id": "US-010a",
-  "title": "Create User (Backend)",
-  "notes": "Split from US-010: User Management",
-  "originalStoryId": "US-010"
+  "id": "3-4a",
+  "title": "Add Medication to List",
+  "notes": "Split from 3-4: Medication List Management",
+  "originalStoryId": "3-4"
 }
 ```
 
-### User Confirmation
+---
 
-After breakdown analysis, report:
+## User Confirmation
+
+After analysis, report the breakdown:
+
 ```
-BMAD Story Breakdown Complete:
-- 5 stories are right-sized ✓
-- 3 stories were split:
-  - US-010 "User Management" → 5 stories (US-010a through US-010e)
-  - US-005 "Task Priority" → 4 stories (US-005a through US-005d)
-  - US-020 "Order System" → 5 stories (US-020a through US-020e)
+BMAD Story Conversion Complete:
+- Source: _bmad-output/planning-artifacts/epics.md
+- Project: TooManyMeds
+- Branch: ralph/toomanyeds-foundation
 
-Total: 19 stories ready for Ralph execution.
+Stories extracted:
+- Epic 1: 6 stories (1-1 through 1-6)
+- Epic 2: 4 stories (2-1 through 2-4)
+- Epic 3: 9 stories (3-1 through 3-9)
+...
+
+Sizing analysis:
+- 35 stories are right-sized
+- 3 stories were split:
+  - 3-4 "Medication Management" → 4 stories (3-4a through 3-4d)
+  - 4-1 "RxNorm Integration" → 4 stories (4-1a through 4-1d)
+  - 5-7 "PDF Report" → 3 stories (5-7a through 5-7c)
+
+Total: 46 stories ready for Ralph execution.
 Proceed with conversion? [Y/n]
 ```
+
+---
+
+## Legacy BMAD Format (for reference)
+
+If `_bmad-output/` is not found, fall back to legacy detection:
+
+### Legacy Structure
+
+```markdown
+# Feature Name
+
+## Epics
+
+### Epic 1: Core Functionality
+#### US-001: First Story
+**Description:** As a user, I want...
+
+**Acceptance Criteria:**
+- Given X, When Y, Then Z
+
+## Functional Requirements
+- FR-01: The system shall...
+
+## Non-Functional Requirements
+- NFR-01: Performance requirement...
+```
+
+### Legacy ID Mapping
+
+| BMAD ID | prd.json ID |
+|---------|-------------|
+| US-001 | US-001 |
+| FR-03 | FR-003 |
+| NFR-01 | NFR-001 |

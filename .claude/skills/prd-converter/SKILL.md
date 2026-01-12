@@ -11,7 +11,7 @@ Converts Product Requirements Documents from various formats into Ralph's `prd.j
 
 | Format | Detection | Example |
 |--------|-----------|---------|
-| **BMAD Method** | FR-XX, US-XX, NFR-XX identifiers, Gherkin syntax | Output from BMAD agents |
+| **BMAD Method** | `_bmad-output/` directory with epics.md, or FR-XX/US-XX identifiers | Output from BMAD agents |
 | **GitHub Spec Kit** | `specs/` or `.speckit/` directory structure | Output from `/speckit.specify` |
 | **Plain Markdown** | `## User Stories` section | Manual PRD documents |
 
@@ -29,12 +29,13 @@ Converts Product Requirements Documents from various formats into Ralph's `prd.j
 
 When invoked without arguments, the converter will search for PRDs in this order:
 
-1. `specs/` directory with numbered subdirs (Spec Kit format - preferred)
-2. `.speckit/` directory (Spec Kit format - legacy)
-3. `*.prd.md` files in current directory (BMAD or plain)
-4. `PRD.md` or `prd.md` in current directory
-5. `tasks/prd-*.md` files
-6. `docs/` or `requirements/` directories
+1. `_bmad-output/` directory with `planning-artifacts/epics.md` (BMAD Method - preferred)
+2. `specs/` directory with numbered subdirs (Spec Kit format)
+3. `.speckit/` directory (Spec Kit format - legacy)
+4. `*.prd.md` files in current directory (BMAD legacy or plain)
+5. `PRD.md` or `prd.md` in current directory
+6. `tasks/prd-*.md` files
+7. `docs/` or `requirements/` directories
 
 ## Workflow
 
@@ -42,7 +43,11 @@ When invoked without arguments, the converter will search for PRDs in this order
 
 First, identify the input format:
 
-- **BMAD**: Look for FR-XX, NFR-XX, US-XX identifiers, "## Epics" headers, Gherkin syntax (Given/When/Then)
+- **BMAD (Modern)**: Look for `_bmad-output/` directory containing:
+  - `planning-artifacts/epics.md` - Story definitions with Gherkin acceptance criteria
+  - `planning-artifacts/prd.md` - Product requirements (optional, for project context)
+  - `implementation-artifacts/sprint-status.yaml` - Story statuses (optional)
+- **BMAD (Legacy)**: Look for FR-XX, NFR-XX, US-XX identifiers, "## Epics" headers, Gherkin syntax in markdown files
 - **Spec Kit**: Look for `specs/` or `.speckit/` directory with spec.md, plan.md, tasks.md in numbered subdirs
 - **Plain Markdown**: Standard PRD with "## User Stories" or "## Requirements" sections
 
@@ -60,43 +65,106 @@ Use the appropriate converter rules:
 - Spec Kit: See `converters/spec-kit.md`
 - Plain Markdown: Direct mapping with story sizing validation
 
-### 4. Detect Feature Type (Code vs Non-Code)
+### 4. Detect Story Type
 
-Before adding acceptance criteria, detect if this is a code feature or documentation/audit task.
+Before adding acceptance criteria, detect the story type to apply appropriate verification requirements.
 
-#### Code Feature Indicators
+#### Story Types
 
-A feature is a **code feature** if it has ANY of these:
-- References to entities, models, APIs, endpoints
-- Mentions database, EF Core, migrations
-- UI components, Blazor, forms, pages
-- Services, handlers, controllers
-- plan.md has "Language/Version" with a value (e.g., ".NET 8")
+| Type | Description | Test Requirement |
+|------|-------------|------------------|
+| **Infrastructure** | Project setup, scaffolding, tooling config | Setup verified (no unit tests) |
+| **Backend Logic** | Services, handlers, business logic, APIs | Unit tests required |
+| **UI Component** | Blazor components, pages, forms | Component tests + Playwright |
+| **Integration** | External service config, legal pages | Integration verified |
+| **Non-Code** | Documentation, audits, reports | Deliverables verified |
 
-#### Non-Code Feature Indicators
+#### Infrastructure Story Indicators
 
-A feature is **non-code** if it has ALL of these:
+A story is **infrastructure** if it has ANY of these:
+- Title contains: "Initialize", "Configure", "Add...Project", "Setup", "Create solution"
+- Creates project structure (*.csproj, solution files)
+- Configures build tools (Tailwind, MSBuild, NuGet packages)
+- Sets up development environment (Aspire, Docker, CI/CD)
+- First stories in a new project (typically Epic 1, stories 1-3)
+- No business logic, just wiring/plumbing
+
+#### Backend Logic Story Indicators
+
+A story is **backend logic** if it has ANY of these:
+- Creates services, handlers, repositories, clients
+- Implements business rules or validation
+- Processes data or transforms state
+- Title contains: "Build...Service", "Implement...Logic", "Create...Handler"
+- Has testable behavior with inputs/outputs
+
+#### UI Component Story Indicators
+
+A story is **UI component** if it has ANY of these:
+- Creates Blazor components or pages
+- Implements user interactions (click, type, navigate)
+- Title contains: "Display", "Create...Component", "Build...UI", "Implement...Page"
+- Acceptance criteria mention visual elements or user actions
+
+#### Integration Story Indicators
+
+A story is **integration** if it has ANY of these:
+- Configures external services (Azure, Cloudflare, APIs)
+- Creates static pages (Privacy Policy, Terms of Service)
+- Sets up monitoring, analytics, health checks
+- Title contains: "Integrate", "Add...Monitoring", "Create...Page" (for static content)
+
+#### Non-Code Story Indicators
+
+A story is **non-code** if it has ALL of these:
 - Output is documentation only (markdown files, reports)
 - No src/ modifications mentioned
-- plan.md shows "Language/Version: N/A" or "Technical Context: N/A"
-- Words like "documentation", "audit", "review", "inventory", "analysis"
+- Words like "documentation", "audit", "review", "inventory"
 
-### 5. Add Standard Acceptance Criteria
+### 5. Add Type-Specific Acceptance Criteria
 
-**For Code Features (default)**, append these acceptance criteria:
-- `Unit tests written (happy path + edge case)`
-- `Follows project architecture patterns from PRD/CLAUDE.md`
-- `dotnet build passes`
-- `dotnet test passes`
-- `dotnet format --verify-no-changes passes`
+Based on the detected story type, append appropriate criteria:
 
-For UI stories, also add:
-- `Verify in browser using Playwright MCP`
+**Infrastructure Stories:**
+```
+- Setup verified (solution builds and runs)
+- Follows project architecture patterns from CLAUDE.md
+- dotnet build passes
+- dotnet format --verify-no-changes passes
+```
 
-**For Non-Code Features**, append these instead:
-- `Deliverables verified (all specified outputs created)`
-- `Follows documentation standards from CLAUDE.md`
-- `All checklist items completed` (if checklists exist)
+**Backend Logic Stories:**
+```
+- Unit tests written (happy path + edge case)
+- Follows project architecture patterns from CLAUDE.md
+- dotnet build passes
+- dotnet test passes
+- dotnet format --verify-no-changes passes
+```
+
+**UI Component Stories:**
+```
+- Component tests written (bUnit)
+- Follows project architecture patterns from CLAUDE.md
+- dotnet build passes
+- dotnet test passes
+- dotnet format --verify-no-changes passes
+- Verify in browser using Playwright MCP
+```
+
+**Integration Stories:**
+```
+- Integration verified (external service connected/configured)
+- Follows project architecture patterns from CLAUDE.md
+- dotnet build passes
+- dotnet format --verify-no-changes passes
+```
+
+**Non-Code Stories:**
+```
+- Deliverables verified (all specified outputs created)
+- Follows documentation standards from CLAUDE.md
+```
 
 ### 6. Story Sizing Analysis & Automatic Breakdown
 

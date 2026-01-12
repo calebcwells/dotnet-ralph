@@ -81,32 +81,76 @@ Every story implementation MUST include unit tests. **Tests are not optional.**
 - **Edge case** - At least one failure/error case
 - Validation failures if applicable
 
-### Test Patterns
+### Test Naming Convention
+
+Use PascalCase method names with `DisplayName` for descriptions:
+
 ```csharp
-public class CreateUserHandlerTests
+// Correct: PascalCase with DisplayName
+[Fact(DisplayName = "GetUserAsync returns user for valid ID")]
+public async Task GetUserAsyncReturnsUserForValidId() { }
+
+// Avoid underscore patterns
+[Fact]
+public void Get_User_Should_Return_User_For_Valid_Id() { }  // Don't do this
+```
+
+### Test Patterns
+
+```csharp
+public class UserServiceTests
 {
-    [Fact]
-    public async Task Handle_ValidRequest_CreatesUser()
+    private readonly Mock<IUserRepository> _repository;
+    private readonly UserService _sut;  // System Under Test
+
+    public UserServiceTests()
+    {
+        _repository = new Mock<IUserRepository>();
+        _sut = new UserService(_repository.Object);
+    }
+
+    [Fact(DisplayName = "GetUserAsync returns user for valid ID")]
+    public async Task GetUserAsyncReturnsUserForValidId()
     {
         // Arrange
-        var handler = new CreateUserHandler(mockRepo.Object);
-        var command = new CreateUserCommand("test@example.com", "Test User");
+        var expected = new User { Id = 1, Name = "Test" };
+        _repository.Setup(r => r.GetByIdAsync(1, default))
+            .ReturnsAsync(expected.ToOption());
 
         // Act
-        var result = await handler.Handle(command);
+        var result = await _sut.GetUserAsync(1);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Email.Should().Be("test@example.com");
+        result.IsSome.Should().BeTrue();
+        result.IfSome(u => u.Name.Should().Be("Test"));
     }
 
-    [Fact]
-    public async Task Handle_DuplicateEmail_ReturnsFailure()
+    [Fact(DisplayName = "GetUserAsync returns None for missing user")]
+    public async Task GetUserAsyncReturnsNoneForMissingUser()
     {
-        // Arrange - setup duplicate scenario
+        // Arrange
+        _repository.Setup(r => r.GetByIdAsync(999, default))
+            .ReturnsAsync(Option<User>.None);
+
         // Act
-        // Assert - verify failure result
+        var result = await _sut.GetUserAsync(999);
+
+        // Assert
+        result.IsNone.Should().BeTrue();
     }
+}
+```
+
+### Testing Either<L, R> (Error Results)
+
+```csharp
+[Fact(DisplayName = "Validate returns error for invalid email")]
+public void ValidateReturnsErrorForInvalidEmail()
+{
+    var result = _sut.Validate(invalidInput);
+
+    result.IsLeft.Should().BeTrue();
+    result.LeftUnsafe().Should().BeOfType<ValidationError.InvalidEmail>();
 }
 ```
 
