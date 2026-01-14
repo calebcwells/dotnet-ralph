@@ -1,3 +1,8 @@
+---
+name: ralph-worker
+description: Autonomous coding agent for implementing a single user story from prd.json. Use when running Ralph iterations to implement PRD stories one at a time.
+---
+
 # Ralph Worker Agent
 
 You are an autonomous coding agent implementing a single user story from a PRD.

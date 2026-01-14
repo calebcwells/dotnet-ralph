@@ -13,29 +13,21 @@ When invoked:
 
 ### 1. Initialization
 
-Read and validate state:
+Read and validate state using the **Read tool** (not bash):
 
-```bash
-# Check prd.json exists
-cat prd.json
+1. **Read prd.json** - Use the Read tool to get the full JSON content
+2. **Check current branch** - Use `git branch --show-current`
+3. **Read progress.txt** - Use the Read tool to check the Codebase Patterns section
 
-# Check current branch
-git branch --show-current
-
-# Read progress.txt patterns section (if exists)
-head -50 progress.txt
-```
+**IMPORTANT**: Always use the Read tool to read prd.json and progress.txt. Do NOT use bash commands like `cat` or `jq` as they have cross-platform escaping issues.
 
 ### 2. Branch Setup
 
 Ensure you're on the correct branch from prd.json `branchName`:
 
 ```bash
-# Get branch name from PRD
-BRANCH=$(cat prd.json | jq -r '.branchName')
-
 # Check if branch exists and checkout, or create from main
-git checkout $BRANCH 2>/dev/null || git checkout -b $BRANCH main
+git checkout <branchName> 2>/dev/null || git checkout -b <branchName> main
 ```
 
 ### 3. Iteration Loop
@@ -44,14 +36,19 @@ For each iteration (default max 10):
 
 **Step 1: Check completion status**
 
-Read prd.json and count incomplete stories:
-```bash
-cat prd.json | jq '[.userStories[] | select(.passes == false)] | length'
-```
+Use the **Read tool** to read prd.json, then parse the JSON to:
+1. Count stories where `passes: false`
+2. Find the next incomplete story (lowest priority number where `passes: false`)
+
+Example parsing logic:
+- Read the `userStories` array from the JSON
+- Filter to stories where `passes` is `false`
+- Sort by `priority` (ascending)
+- The first one is the next story to implement
 
 **Step 2: If all complete, announce success and exit**
 
-If the count is 0 (all stories have `passes: true`):
+If all stories have `passes: true`:
 ```
 Ralph completed all user stories successfully!
 
@@ -65,13 +62,26 @@ All stories have been implemented, tested, and committed.
 
 **Step 3: Otherwise, spawn worker subagent**
 
-Use the Task tool to spawn a ralph-worker subagent:
+Use the Task tool with `subagent_type: general-purpose` and include the ralph-worker instructions from `.claude/agents/ralph-worker.md` in the prompt.
+
+First, read `.claude/agents/ralph-worker.md` to get the full worker instructions, then spawn with:
 
 ```
+Task tool parameters:
+- subagent_type: general-purpose
+- description: "Implement [Story ID] [Story Title]"
+- prompt: [Include full content of ralph-worker.md, plus:]
+
+---
+## Current Task Context
+
 Implement the next incomplete user story from prd.json.
 
+**Story to implement:** [Story ID] - [Story Title]
+**Acceptance Criteria:** [List from prd.json]
+
 Read the following files to understand the current state:
-- prd.json - Find the highest priority story where passes: false
+- prd.json - Find the story details
 - progress.txt - Check Codebase Patterns section for learnings
 - CLAUDE.md - Project conventions and patterns
 
@@ -86,7 +96,7 @@ Current iteration: [N] of [max]
 
 **Step 4: After subagent completes**
 
-Re-read prd.json to check if more stories remain:
+Use the **Read tool** to re-read prd.json and check if more stories remain:
 - If incomplete stories remain, continue to next iteration
 - If all complete, announce success and exit
 
@@ -125,15 +135,12 @@ Usage:
 
 ## Monitoring Progress
 
-During execution, you can check:
+Use the Read tool to check status:
+- **prd.json** - Parse to see story completion status
+- **progress.txt** - Read to see recent learnings
+
+Git commands for history:
 ```bash
-# See story status
-cat prd.json | jq '.userStories[] | {id, title, passes}'
-
-# See recent progress
-tail -50 progress.txt
-
-# Check git history
 git log --oneline -10
 ```
 
@@ -163,3 +170,13 @@ For UI stories, the worker subagent uses Playwright MCP:
 - `mcp__playwright__browser_take_screenshot` - Capture screenshots
 
 No additional setup required - Playwright MCP is built into Claude Code.
+
+## Cross-Platform Notes
+
+**CRITICAL**: This skill must work on Windows, macOS, and Linux.
+
+- **DO NOT** use `jq` - it's not installed by default on Windows
+- **DO NOT** pipe JSON through bash - escaping issues between shells
+- **DO** use the Read tool to read JSON files directly
+- **DO** parse JSON content natively (Claude can parse JSON)
+- **DO** use simple git commands that work cross-platform
